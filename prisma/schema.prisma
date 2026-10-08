@@ -1,13 +1,11 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum NotificationChannel {
@@ -27,159 +25,180 @@ enum NotificationStatus {
   CANCELLED
 }
 
-enum AttemptStatus {
+enum DeliveryStatus {
   SUCCESS
   FAILED
   RETRYING
 }
 
-enum WebhookDeliveryStatus {
-  PENDING
-  SUCCESS
-  FAILED
-  RETRYING
+/// Client organization / business tenant using the platform.
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  email     String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  slug      String   @unique @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  apiKeys         ApiKey[]
+  idempotencyKeys IdempotencyKey[]
+  credentials     ProviderCredential[]
+  templates       NotificationTemplate[]
+  notifications   Notification[]
+  webhookUrls     WebhookUrl[]
+
+  @@map("organizations")
 }
 
-model User {
-  id         String   @id @default(uuid()) @db.Uuid
-  externalId String   @unique @map("external_id") @db.VarChar(255)
-  email      String   @db.VarChar(255)
-  name       String?  @db.VarChar(255)
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+/// Secret API Keys generated for each tenant to authenticate API requests.
+model ApiKey {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String       @db.VarChar(255)
+  keyHash        String       @unique @map("key_hash") @db.VarChar(255)
+  prefix         String       @db.VarChar(64)
+  lastUsedAt     DateTime?    @map("last_used_at")
+  expiresAt      DateTime?    @map("expires_at")
+  revokedAt      DateTime?    @map("revoked_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
 
-  notifications Notification[]
-  preferences   NotificationPreference[]
-
-  @@map("users")
+  @@index([organizationId])
+  @@map("api_keys")
 }
 
+/// Request deduplication storage to ensure idempotent dispatches per tenant.
+model IdempotencyKey {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key            String       @db.VarChar(255)
+  requestHash    String       @map("request_hash") @db.VarChar(255)
+  responseCode   Int?         @map("response_code")
+  responseBody   Json?        @map("response_body")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  expiresAt      DateTime     @map("expires_at")
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@map("idempotency_keys")
+}
+
+/// Encrypted third-party provider credentials (BYO keys for SendGrid, Twilio, FCM, etc.).
+model ProviderCredential {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel        NotificationChannel
+  provider       String              @db.VarChar(100) // e.g. "sendgrid", "twilio", "fcm"
+  credentials    Json // Encrypted JSON containing API keys, SID, tokens
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  @@unique([organizationId, channel, provider])
+  @@index([organizationId])
+  @@map("provider_credentials")
+}
+
+/// Reusable templates per organization with dynamic variable placeholders.
 model NotificationTemplate {
-  id        String              @id @default(uuid()) @db.Uuid
-  name      String              @db.VarChar(255)
-  eventType String              @map("event_type") @db.VarChar(255)
-  channel   NotificationChannel
-  subject   String?             @db.Text
-  body      String              @db.Text
-  version   Int                 @default(1)
-  active    Boolean             @default(true)
-  createdAt DateTime            @default(now()) @map("created_at")
-  updatedAt DateTime            @updatedAt @map("updated_at")
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String              @db.VarChar(255)
+  slug           String              @db.VarChar(255)
+  channel        NotificationChannel
+  subject        String?             @db.Text
+  body           String              @db.Text
+  version        Int                 @default(1)
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
 
   notifications Notification[]
 
-  @@unique([name, version])
+  @@unique([organizationId, slug, version])
+  @@index([organizationId])
   @@map("notification_templates")
 }
 
+/// Primary notification dispatch record created upon API ingestion.
 model Notification {
-  id          String              @id @default(uuid()) @db.Uuid
-  externalId  String?             @unique @map("external_id") @db.VarChar(255)
-  userId      String              @map("user_id") @db.Uuid
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  templateId  String?             @map("template_id") @db.Uuid
-  template    NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  channel     NotificationChannel
-  status      NotificationStatus  @default(QUEUED)
-  subject     String?             @db.Text
-  content     String?             @db.Text
-  metadata    Json?               @default("{}")
-  scheduledAt DateTime?           @map("scheduled_at")
-  sentAt      DateTime?           @map("sent_at")
-  failedAt    DateTime?           @map("failed_at")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateId     String?               @map("template_id") @db.Uuid
+  template       NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  externalId     String?               @map("external_id") @db.VarChar(255)
+  channel        NotificationChannel
+  recipient      Json // JSON payload: { email, phone, pushToken, externalUserId }
+  subject        String?               @db.Text
+  content        String?               @db.Text
+  metadata       Json?                 @default("{}")
+  status         NotificationStatus    @default(QUEUED)
+  scheduledAt    DateTime?             @map("scheduled_at")
+  sentAt         DateTime?             @map("sent_at")
+  failedAt       DateTime?             @map("failed_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
 
-  attempts NotificationAttempt[]
+  deliveries Delivery[]
 
-  @@index([userId])
+  @@index([organizationId])
   @@index([status])
   @@index([scheduledAt])
   @@map("notifications")
 }
 
-model NotificationAttempt {
-  id               String        @id @default(uuid()) @db.Uuid
-  notificationId   String        @map("notification_id") @db.Uuid
-  notification     Notification  @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  attemptNumber    Int           @map("attempt_number")
-  status           AttemptStatus
-  providerResponse Json?         @map("provider_response")
-  errorMessage     String?       @map("error_message") @db.Text
-  startedAt        DateTime      @default(now()) @map("started_at")
-  completedAt      DateTime?     @map("completed_at")
-  createdAt        DateTime      @default(now()) @map("created_at")
+/// Individual attempt execution log when sending a notification to a channel provider.
+model Delivery {
+  id               String         @id @default(uuid()) @db.Uuid
+  notificationId   String         @map("notification_id") @db.Uuid
+  notification     Notification   @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  attemptNumber    Int            @map("attempt_number")
+  status           DeliveryStatus
+  provider         String?        @db.VarChar(100) // e.g. "sendgrid", "twilio", "fcm", "webhook"
+  providerResponse Json?          @map("provider_response")
+  errorMessage     String?        @map("error_message") @db.Text
+  startedAt        DateTime       @default(now()) @map("started_at")
+  completedAt      DateTime?      @map("completed_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  webhookHandles WebhookHandle[]
 
   @@index([notificationId])
-  @@map("notification_attempts")
+  @@map("deliveries")
 }
 
-model NotificationPreference {
-  id        String              @id @default(uuid()) @db.Uuid
-  userId    String              @map("user_id") @db.Uuid
-  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  eventType String              @map("event_type") @db.VarChar(255)
-  channel   NotificationChannel
-  enabled   Boolean             @default(true)
-  createdAt DateTime            @default(now()) @map("created_at")
-  updatedAt DateTime            @updatedAt @map("updated_at")
+/// Outbound webhook callback endpoints registered by client organizations.
+model WebhookUrl {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  url            String       @db.Text
+  secret         String       @db.VarChar(255) // Secret for HMAC-SHA256 signature verification
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  @@unique([userId, eventType, channel])
-  @@map("notification_preferences")
+  @@index([organizationId])
+  @@map("webhook_urls")
 }
 
-model ApiKey {
-  id         String    @id @default(uuid()) @db.Uuid
-  name       String    @db.VarChar(255)
-  keyHash    String    @unique @map("key_hash") @db.VarChar(255)
-  prefix     String    @db.VarChar(64)
-  lastUsedAt DateTime? @map("last_used_at")
-  expiresAt  DateTime? @map("expires_at")
-  revokedAt  DateTime? @map("revoked_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+/// Inbound webhook event log capturing callbacks from providers (SendGrid, Twilio, FCM).
+model WebhookHandle {
+  id                String    @id @default(uuid()) @db.Uuid
+  deliveryId        String?   @map("delivery_id") @db.Uuid
+  delivery          Delivery? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  provider          String    @db.VarChar(100) // e.g. "sendgrid", "twilio", "fcm"
+  providerMessageId String?   @map("provider_message_id") @db.VarChar(255)
+  eventType         String    @map("event_type") @db.VarChar(255) // e.g. "delivered", "bounced", "opened"
+  payload           Json // Full raw callback payload received from provider
+  receivedAt        DateTime  @default(now()) @map("received_at")
 
-  @@map("api_keys")
-}
-
-model IdempotencyKey {
-  id           String   @id @default(uuid()) @db.Uuid
-  key          String   @unique @db.VarChar(255)
-  requestHash  String   @map("request_hash") @db.VarChar(255)
-  responseCode Int?     @map("response_code")
-  responseBody Json?    @map("response_body")
-  createdAt    DateTime @default(now()) @map("created_at")
-  expiresAt    DateTime @map("expires_at")
-
-  @@map("idempotency_keys")
-}
-
-model WebhookEndpoint {
-  id        String   @id @default(uuid()) @db.Uuid
-  url       String   @db.Text
-  secret    String   @db.VarChar(255)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  deliveries WebhookDelivery[]
-
-  @@map("webhook_endpoints")
-}
-
-model WebhookDelivery {
-  id                String                @id @default(uuid()) @db.Uuid
-  webhookEndpointId String                @map("webhook_endpoint_id") @db.Uuid
-  webhookEndpoint   WebhookEndpoint       @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
-  eventType         String                @map("event_type") @db.VarChar(255)
-  payload           Json
-  status            WebhookDeliveryStatus
-  attemptCount      Int                   @default(0) @map("attempt_count")
-  lastError         String?               @map("last_error") @db.Text
-  nextAttemptAt     DateTime?             @map("next_attempt_at")
-  createdAt         DateTime              @default(now()) @map("created_at")
-  updatedAt         DateTime              @updatedAt @map("updated_at")
-
-  @@index([webhookEndpointId])
-  @@index([status])
-  @@map("webhook_deliveries")
+  @@index([deliveryId])
+  @@index([providerMessageId])
+  @@map("webhook_handles")
 }
