@@ -3,15 +3,22 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateOrganizationDto } from './dto/create-org.dto.js';
+import { LoginDTO } from './dto/login-org.dto.js';
+import { OrganizationJwtPayload } from '../common/interfaces/jwt-payload.interface.js';
 
 @Injectable()
 export class OrganizationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   /**
    * Helper utility to auto-generate a clean, URL-safe slug from organization name.
@@ -82,5 +89,55 @@ export class OrganizationService {
       throw new InternalServerErrorException('An error occurred while creating the organization.');
     }
   }
+
+  async loginOrg(dto: LoginDTO) {
+    const { email, password } = dto;
+
+    try {
+      const existingUser = await this.prisma.organization.findUnique({
+        where: {
+          email,
+        },
+      });
+
+      if (!existingUser) {
+        throw new UnauthorizedException('Invalid email or password.');
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, existingUser.password);
+
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid email or password.');
+      }
+
+      // Payload storing essential organization details
+      const payload: OrganizationJwtPayload = {
+        sub: existingUser.id,
+        name: existingUser.name,
+        email: existingUser.email,
+        slug: existingUser.slug,
+      };
+
+      const token = await this.jwtService.signAsync(payload, {
+        secret: process.env.JWT_SECRET || 'supersecretjwtkey',
+        expiresIn: '7d',
+      });
+
+      const { password: _, ...organizationData } = existingUser;
+
+      return {
+        message: 'Login successful',
+        token,
+        organization: organizationData,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('An error occurred while logging in.');
+    }
+  }
 }
+
 
