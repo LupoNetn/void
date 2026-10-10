@@ -13,6 +13,8 @@ import { CreateOrganizationDto } from './dto/create-org.dto.js';
 import { LoginDTO } from './dto/login-org.dto.js';
 import { OrganizationJwtPayload } from '../common/interfaces/jwt-payload.interface.js';
 
+import { generateApiKey } from '../common/utils/api-key.util.js';
+
 @Injectable()
 export class OrganizationService {
   constructor(
@@ -42,30 +44,48 @@ export class OrganizationService {
       throw new BadRequestException('Could not generate a valid URL slug from the provided organization name.');
     }
 
-    // Hash the password securely using bcrypt (10 rounds salt)
+    
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    
+    const { rawKey, prefix, keyHash } = generateApiKey('live');
+
     try {
-      const organization = await this.prisma.organization.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          slug,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          slug: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+      const result = await this.prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            name,
+            email,
+            password: hashedPassword,
+            slug,
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            slug: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        // Create default API Key linked to the organization
+        await tx.apiKey.create({
+          data: {
+            organizationId: organization.id,
+            name: 'Default Secret Key',
+            prefix,
+            keyHash,
+          },
+        });
+
+        return organization;
       });
 
       return {
         message: 'Organization created successfully',
-        data: organization,
+        data: result,
+        apiKey: rawKey, // Raw key returned ONLY once upon creation
       };
     } catch (error) {
       // Prisma duplicate key / unique constraint error (P2002)
@@ -118,16 +138,22 @@ export class OrganizationService {
         slug: existingUser.slug,
       };
 
-      const token = await this.jwtService.signAsync(payload, {
-        secret: process.env.JWT_SECRET || 'supersecretjwtkey',
-        expiresIn: '7d',
+      const accessToken = await this.jwtService.signAsync(payload, {
+        secret: process.env.JWT_ACCESS_SECRET || 'supersecretjwtkey',
+        expiresIn: '25m',
       });
+
+      const refreshToken = await this.jwtService.signAsync(payload, {
+        secret: process.env.JWT_REFRESH_SECRET || 'supersecretjwtkey',
+        expiresIn: '7d',
+      })
 
       const { password: _, ...organizationData } = existingUser;
 
       return {
         message: 'Login successful',
-        token,
+        accessToken,
+        refreshToken,
         organization: organizationData,
       };
     } catch (error) {
@@ -136,6 +162,50 @@ export class OrganizationService {
       }
 
       throw new InternalServerErrorException('An error occurred while logging in.');
+    }
+  }
+
+  async refreshToken(token: string) {
+    try {
+      
+      const verifiedPayload: OrganizationJwtPayload = await this.jwtService.verifyAsync(token, {
+        secret: process.env.JWT_REFRESH_SECRET || 'supersecretjwtkey',
+      })
+
+      const payload: OrganizationJwtPayload = {
+        sub: verifiedPayload.sub,
+        name: verifiedPayload.name,
+        email: verifiedPayload.email,
+        slug: verifiedPayload.slug,
+      };
+  
+
+      if (!payload) {
+        throw new UnauthorizedException('Invalid refresh token.')
+      }
+
+      const accessToken = await this.jwtService.signAsync(payload, {
+        secret: process.env.JWT_ACCESS_SECRET || 'supersecretjwtkey',
+        expiresIn: '25m',
+      })
+
+      const refreshToken = await this.jwtService.signAsync(payload, {
+        secret: process.env.JWT_REFRESH_SECRET || 'supersecretjwtkey',
+        expiresIn: '7d',
+      })
+
+      return {
+        message: 'Refresh token successful',
+        accessToken,
+        refreshToken
+      }
+
+    } catch (error) {
+      if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('An error occurred while refreshing the token.')
     }
   }
 }

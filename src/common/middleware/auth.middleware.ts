@@ -42,7 +42,7 @@ export class AuthMiddleware implements NestMiddleware {
       const payload: OrganizationJwtPayload = await this.jwtService.verifyAsync(
         token,
         {
-          secret: process.env.JWT_SECRET || 'supersecretjwtkey',
+          secret: process.env.JWT_ACCESS_SECRET || 'supersecretjwtkey',
         },
       );
 

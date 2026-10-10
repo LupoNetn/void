@@ -5,9 +5,11 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
 import { OrganizationService } from './organization.service.js';
 import { CreateOrganizationDto } from './dto/create-org.dto.js';
 import { LoginDTO } from './dto/login-org.dto.js';
@@ -33,7 +35,14 @@ export class OrganizationController {
     const result = await this.organizationService.loginOrg(dto);
 
     // Set secure HTTP-only cookie with JWT token
-    res.cookie('token', result.token, {
+    res.cookie('accessToken', result.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 25 * 60 * 1000, // 25 minutes
+    });
+
+    res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -49,6 +58,19 @@ export class OrganizationController {
       message: 'Profile retrieved successfully',
       organization: org,
     };
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refreshToken(@Req() req: Request) {
+    const header = req.headers.authorization;
+    const token = header?.split(' ')[1];
+
+    if (!token) {
+      throw new UnauthorizedException('No refresh token was provided for this request.')
+    }
+
+    return await this.organizationService.refreshToken(token);
   }
 
   @Post('logout')

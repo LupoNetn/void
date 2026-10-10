@@ -1,6 +1,7 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import type { Request } from 'express';
-import { OrganizationJwtPayload } from '../interfaces/jwt-payload.interface.js';
+import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import type { Request } from "express";
+import type { OrganizationJwtPayload } from "../interfaces/jwt-payload.interface.js";
+
 
 export const CurrentOrg = createParamDecorator(
   (data: keyof OrganizationJwtPayload | undefined, ctx: ExecutionContext) => {
@@ -12,5 +13,5 @@ export const CurrentOrg = createParamDecorator(
     }
 
     return data ? org[data] : org;
-  },
-);
+  }
+)
