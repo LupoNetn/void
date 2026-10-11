@@ -12,6 +12,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { OrganizationModule } from './organization/organization.module.js';
 import { ApiKeyModule } from './api-key/api-key.module.js';
 import { AuthMiddleware } from './common/middleware/auth.middleware.js';
+import { ProviderCredentialsModule } from './provider-credentials/provider-credentials.module.js';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AuthMiddleware } from './common/middleware/auth.middleware.js';
     PrismaModule,
     OrganizationModule,
     ApiKeyModule,
+    ProviderCredentialsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -36,6 +38,6 @@ export class AppModule implements NestModule {
         { path: 'organization', method: RequestMethod.POST },
         { path: 'organization/login', method: RequestMethod.POST },
       )
-      .forRoutes('organization/me', 'api-keys');
+      .forRoutes('organization/me', 'api-keys', 'provider-credentials');
   }
 }
