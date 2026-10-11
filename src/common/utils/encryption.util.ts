@@ -1,8 +1,7 @@
 import crypto from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 16; 
-const AUTH_TAG_LENGTH = 16; 
+const IV_LENGTH = 16;
 
 /**
  * Derives a 32-byte Buffer key from ENCRYPTION_SECRET environment variable
@@ -15,7 +14,7 @@ function getEncryptionKey(): Buffer {
 
 /**
  * Output format: iv:authTag:ciphertext (hex-encoded)
-**/
+ */
 export function encryptData<T = any>(data: T): string {
   const text = typeof data === 'string' ? data : JSON.stringify(data);
   const iv = crypto.randomBytes(IV_LENGTH);
