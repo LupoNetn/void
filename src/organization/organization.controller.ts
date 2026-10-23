@@ -64,7 +64,7 @@ export class OrganizationController {
   @HttpCode(HttpStatus.OK)
   async refreshToken(@Req() req: Request) {
     const header = req.headers.authorization;
-    const token = header?.split(' ')[1];
+    const token = header?.split(' ')[1] || req.cookies?.refreshToken;
 
     if (!token) {
       throw new UnauthorizedException('No refresh token was provided for this request.')
@@ -76,8 +76,8 @@ export class OrganizationController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('token');
-    res.clearCookie('org_info');
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
     return {
       message: 'Logged out successfully',
     };

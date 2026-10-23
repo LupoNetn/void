@@ -31,7 +31,7 @@ export class AuthMiddleware implements NestMiddleware {
 
     // 2. Fallback to reading token from cookies
     if (!token && req.cookies) {
-      token = req.cookies['token'] || req.cookies['auth_token'];
+      token = req.cookies['accessToken'] || req.cookies['token'];
     }
 
     if (!token) {
@@ -46,32 +46,6 @@ export class AuthMiddleware implements NestMiddleware {
         },
       );
 
-      // Store decoded organization details / token in cookies for subsequent requests
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
-
-      // Optionally store a non-sensitive client-readable cookie of organization info
-      res.cookie(
-        'org_info',
-        JSON.stringify({
-          id: payload.sub,
-          name: payload.name,
-          email: payload.email,
-          slug: payload.slug,
-        }),
-        {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        },
-      );
-
-      // Attach organization payload to request object
       req.organization = payload;
 
       next();
