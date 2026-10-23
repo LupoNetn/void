@@ -14,6 +14,7 @@ import { ApiKeyModule } from './api-key/api-key.module.js';
 import { AuthMiddleware } from './common/middleware/auth.middleware.js';
 import { ProviderCredentialsModule } from './provider-credentials/provider-credentials.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { WebhooksModule } from './webhooks/webhooks.module.js';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { NotificationsModule } from './notifications/notifications.module.js';
     ApiKeyModule,
     ProviderCredentialsModule,
     NotificationsModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -39,7 +41,10 @@ export class AppModule implements NestModule {
       .exclude(
         { path: 'organization', method: RequestMethod.POST },
         { path: 'organization/login', method: RequestMethod.POST },
+        { path: 'organization/refresh', method: RequestMethod.POST },
+        { path: 'webhooks/providers/:provider', method: RequestMethod.POST },
+        { path: 'notifications/send', method: RequestMethod.POST },
       )
-      .forRoutes('organization/me', 'api-keys', 'provider-credentials', 'notifications');
+      .forRoutes('organization/me', 'organization/logout', 'api-keys', 'provider-credentials', 'notifications', 'webhooks');
   }
 }
