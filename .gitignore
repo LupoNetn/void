@@ -62,3 +62,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 README.md
 PRD.md
 
+# Local implementation and learning handbook (requested, intentionally private)
+IMPLEMENTATION_GUIDE.md
