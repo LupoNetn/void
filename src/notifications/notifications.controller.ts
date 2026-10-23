@@ -9,6 +9,8 @@ import {
     Body,
     Param,
     Query,
+    Headers,
+    UseGuards,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service.js';
 import { CreateNotificationTemplate } from './dto/create-template.dto.js';
@@ -16,10 +18,34 @@ import { UpdateNotificationTemplateDto } from './dto/update-template.dto.js';
 import { QueryNotificationTemplateDto } from './dto/query-template.dto.js';
 import { CurrentOrg } from '../common/decorators/current-org.decorator.js';
 import type { OrganizationJwtPayload } from '../common/interfaces/jwt-payload.interface.js';
+import { SendNotificationDTO } from './dto/send-notification.dto.js';
+import { QueryNotificationsDto } from './dto/query-notifications.dto.js';
+import { NotificationAuthGuard } from '../common/guards/notification-auth.guard.js';
 
 @Controller('notifications')
 export class NotificationsController {
     constructor(private readonly notificationService: NotificationsService) { }
+
+    @Post('send')
+    @UseGuards(NotificationAuthGuard)
+    @HttpCode(HttpStatus.ACCEPTED)
+    async send(@Body() dto: SendNotificationDTO, @CurrentOrg() org: OrganizationJwtPayload, @Headers('idempotency-key') key?: string) {
+        return this.notificationService.send(org.sub, dto, key);
+    }
+
+    @Get()
+    async list(@Query() query: QueryNotificationsDto, @CurrentOrg() org: OrganizationJwtPayload) {
+        return this.notificationService.list(org.sub, query);
+    }
+
+    @Get('stats')
+    async stats(@CurrentOrg() org: OrganizationJwtPayload) { return this.notificationService.stats(org.sub); }
+
+    @Get(':id')
+    async get(@Param('id') id: string, @CurrentOrg() org: OrganizationJwtPayload) { return this.notificationService.get(org.sub, id); }
+
+    @Post(':id/cancel')
+    async cancel(@Param('id') id: string, @CurrentOrg() org: OrganizationJwtPayload) { return this.notificationService.cancel(org.sub, id); }
 
     @Post('templates')
     @HttpCode(HttpStatus.CREATED)
