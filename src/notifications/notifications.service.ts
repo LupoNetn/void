@@ -11,6 +11,10 @@ import { UpdateNotificationTemplateDto } from './dto/update-template.dto.js';
 import { QueryNotificationTemplateDto } from './dto/query-template.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
+import { SendNotificationDTO } from './dto/send-notification.dto.js';
+import { QueryNotificationsDto } from './dto/query-notifications.dto.js';
+import { DispatchService } from './dispatch.service.js';
 
 const TEMPLATE_SELECT_FIELDS = {
     id: true,
@@ -27,7 +31,78 @@ const TEMPLATE_SELECT_FIELDS = {
 
 @Injectable()
 export class NotificationsService {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(private readonly prisma: PrismaService, private readonly dispatcher: DispatchService) { }
+
+    private render(value: string | null | undefined, variables: Record<string, unknown>) {
+        if (!value) return value;
+        return value.replace(/{{\s*([\w.]+)\s*}}/g, (_, path: string) => {
+            const result = path.split('.').reduce<unknown>((current, key) => current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined, variables);
+            return result === undefined || result === null ? '' : String(result);
+        });
+    }
+
+    async send(organizationId: string, dto: SendNotificationDTO, idempotencyKey?: string) {
+        const requestHash = createHash('sha256').update(JSON.stringify(dto)).digest('hex');
+        if (idempotencyKey) {
+            const existing = await this.prisma.idempotencyKey.findUnique({ where: { organizationId_key: { organizationId, key: idempotencyKey } } });
+            if (existing) {
+                if (existing.requestHash !== requestHash) throw new ConflictException('This idempotency key was already used with a different request.');
+                return existing.responseBody;
+            }
+        }
+        const template = dto.template ? await this.prisma.notificationTemplate.findFirst({ where: { organizationId, slug: dto.template, channel: dto.channel, active: true }, orderBy: { version: 'desc' } }) : null;
+        if (dto.template && !template) throw new NotFoundException(`Active template '${dto.template}' was not found for ${dto.channel}.`);
+        if (!template && !dto.content) throw new BadRequestException('Provide content or an active template slug.');
+        const variables = { ...dto.variables, recipient: dto.recipient };
+        const notification = await this.prisma.notification.create({ data: {
+            organizationId, templateId: template?.id, externalId: dto.externalId,
+            channel: dto.channel, recipient: dto.recipient as unknown as Prisma.InputJsonValue,
+            subject: this.render(dto.subject ?? template?.subject, variables),
+            content: this.render(dto.content ?? template?.body, variables), metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
+            scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+        } });
+        const response = { message: 'Notification accepted for delivery.', data: notification };
+        if (idempotencyKey) await this.prisma.idempotencyKey.create({ data: { organizationId, key: idempotencyKey, requestHash, responseCode: 202, responseBody: response as unknown as Prisma.InputJsonValue, expiresAt: new Date(Date.now() + 86400000) } });
+        if (!notification.scheduledAt || notification.scheduledAt <= new Date()) this.dispatcher.wake(notification.id);
+        return response;
+    }
+
+    async list(organizationId: string, query: QueryNotificationsDto) {
+        const page = query.page ?? 1; const limit = query.limit ?? 20;
+        const where: Prisma.NotificationWhereInput = { organizationId };
+        if (query.status) where.status = query.status;
+        if (query.channel) where.channel = query.channel;
+        if (query.search) where.OR = [{ externalId: { contains: query.search, mode: 'insensitive' } }, { subject: { contains: query.search, mode: 'insensitive' } }];
+        const [data, total] = await this.prisma.$transaction([
+            this.prisma.notification.findMany({ where, include: { deliveries: { orderBy: { attemptNumber: 'desc' }, take: 1 } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+            this.prisma.notification.count({ where }),
+        ]);
+        return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    }
+
+    async get(organizationId: string, id: string) {
+        const data = await this.prisma.notification.findFirst({ where: { id, organizationId }, include: { deliveries: { orderBy: { attemptNumber: 'desc' } }, template: { select: TEMPLATE_SELECT_FIELDS } } });
+        if (!data) throw new NotFoundException('Notification not found.');
+        return { data };
+    }
+
+    async cancel(organizationId: string, id: string) {
+        const updated = await this.prisma.notification.updateMany({ where: { id, organizationId, status: { in: ['QUEUED', 'RETRYING'] } }, data: { status: 'CANCELLED' } });
+        if (!updated.count) throw new ConflictException('Only queued or retrying notifications can be cancelled.');
+        return { message: 'Notification cancelled.' };
+    }
+
+    async stats(organizationId: string) {
+        const [total, sent, failed, queued, recent, byChannel] = await Promise.all([
+            this.prisma.notification.count({ where: { organizationId } }),
+            this.prisma.notification.count({ where: { organizationId, status: 'SENT' } }),
+            this.prisma.notification.count({ where: { organizationId, status: 'FAILED' } }),
+            this.prisma.notification.count({ where: { organizationId, status: { in: ['QUEUED', 'PROCESSING', 'RETRYING'] } } }),
+            this.prisma.notification.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 6, select: { id: true, externalId: true, channel: true, status: true, subject: true, createdAt: true } }),
+            this.prisma.notification.groupBy({ by: ['channel'], where: { organizationId }, _count: true }),
+        ]);
+        return { data: { total, sent, failed, queued, deliveryRate: total ? Math.round((sent / total) * 1000) / 10 : 100, recent, byChannel: byChannel.map(x => ({ channel: x.channel, count: x._count })) } };
+    }
 
     private generateSlug(name: string): string {
         return name
