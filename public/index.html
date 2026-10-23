@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Relay notification infrastructure dashboard" />
+  <title>Relay — Notification infrastructure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="noise"></div>
+  <section id="auth" class="auth-shell">
+    <div class="auth-brand">
+      <a class="brand" href="#"><span class="brand-mark">R</span><span>Relay</span></a>
+      <div class="hero-copy"><span class="eyebrow"><i></i> Infrastructure for every message</span><h1>Deliver notifications.<br><span>Keep the signal.</span></h1><p>One durable API for email, SMS, push and webhooks — powered by credentials you own.</p></div>
+      <div class="signal-card"><div class="signal-head"><span>Live delivery stream</span><span class="live"><i></i> Operational</span></div><div class="signal-line"><span class="channel-icon email">↗</span><div><strong>Welcome to Acme</strong><small>Email · eu-west-1</small></div><span class="status success">Delivered</span></div><div class="signal-line"><span class="channel-icon sms">⌁</span><div><strong>Your code is 842 019</strong><small>SMS · us-east-1</small></div><span class="status success">Delivered</span></div><div class="signal-line muted"><span class="channel-icon push">◇</span><div><strong>Payment received</strong><small>Push · 24ms</small></div><span class="status queued">Queued</span></div></div>
+    </div>
+    <div class="auth-panel"><div class="auth-form"><div class="mobile-brand brand"><span class="brand-mark">R</span><span>Relay</span></div><h2 id="auth-title">Welcome back</h2><p id="auth-subtitle">Sign in to your notification workspace.</p><form id="auth-form"><label id="name-field" class="hidden">Organization name<input name="name" placeholder="Acme Inc." /></label><label>Email address<input name="email" type="email" placeholder="you@company.com" required /></label><label>Password<input name="password" type="password" placeholder="At least 8 characters" minlength="8" required /></label><button class="primary wide" type="submit"><span id="auth-submit">Continue</span><span>→</span></button></form><p class="auth-switch"><span id="switch-copy">New to Relay?</span> <button id="switch-auth">Create an account</button></p><p class="form-error" id="auth-error"></p></div><div class="auth-foot">Protected by secure, HTTP-only sessions</div></div>
+  </section>
+
+  <section id="app" class="app-shell hidden">
+    <aside class="sidebar"><div class="brand"><span class="brand-mark">R</span><span>Relay</span></div><div class="workspace"><span id="org-avatar">A</span><div><strong id="org-name">Workspace</strong><small id="org-slug">production</small></div><span>⌄</span></div><nav><p>Workspace</p><button data-view="overview" class="active"><span>⌂</span>Overview</button><button data-view="notifications"><span>↗</span>Notifications</button><button data-view="templates"><span>▱</span>Templates</button><p>Developer</p><button data-view="providers"><span>◈</span>Providers</button><button data-view="api"><span>⌘</span>API keys</button><button data-view="webhooks"><span>⌁</span>Webhooks</button></nav><div class="sidebar-foot"><div class="docs"><span>?</span><div><strong>Need a hand?</strong><small>Read the API guide</small></div></div><button id="logout" class="logout">Sign out <span>⇥</span></button></div></aside>
+    <main><header><button id="menu">☰</button><div><span class="breadcrumb">Relay /</span><strong id="page-title">Overview</strong></div><div class="header-actions"><button class="command">⌕ <span>Search</span><kbd>⌘ K</kbd></button><button class="icon-btn">◌</button><button class="primary" data-action="send">Send notification <span>↗</span></button></div></header><div id="content" class="content"></div></main>
+  </section>
+  <div id="modal" class="modal-wrap hidden"><div class="modal"><div class="modal-head"><div><h3 id="modal-title">New</h3><p id="modal-description"></p></div><button id="modal-close">×</button></div><form id="modal-form"></form></div></div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
