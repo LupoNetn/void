@@ -35,6 +35,10 @@ export class DispatchService implements OnModuleInit, OnModuleDestroy {
     if (this.polling) return;
     this.polling = true;
     try {
+      await this.prisma.notification.updateMany({
+        where: { status: NotificationStatus.PROCESSING, updatedAt: { lt: new Date(Date.now() - 120_000) } },
+        data: { status: NotificationStatus.RETRYING },
+      });
       const jobs = await this.prisma.notification.findMany({
         where: {
           status: { in: [NotificationStatus.QUEUED, NotificationStatus.RETRYING] },

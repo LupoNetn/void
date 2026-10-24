@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class WebhooksService {
@@ -24,12 +23,4 @@ export class WebhooksService {
     return { message: 'Webhook endpoint deleted.' };
   }
 
-  async ingest(provider: string, payload: Record<string, unknown>) {
-    const providerMessageId = String(payload.sg_message_id ?? payload.MessageSid ?? payload.messageId ?? payload.id ?? '') || null;
-    const eventType = String(payload.event ?? payload.MessageStatus ?? payload.status ?? 'received');
-    const delivery = providerMessageId ? await this.prisma.delivery.findFirst({ where: { providerResponse: { path: ['body', 'id'], equals: providerMessageId } } }) : null;
-    const data = await this.prisma.webhookHandle.create({ data: { provider: provider.toLowerCase(), providerMessageId, eventType, payload: payload as Prisma.InputJsonValue, deliveryId: delivery?.id } });
-    if (delivery && ['failed', 'bounced', 'undelivered'].includes(eventType.toLowerCase())) await this.prisma.notification.update({ where: { id: delivery.notificationId }, data: { status: 'FAILED', failedAt: new Date() } });
-    return { received: true, id: data.id };
-  }
 }

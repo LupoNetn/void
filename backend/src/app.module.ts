@@ -15,13 +15,14 @@ import { AuthMiddleware } from './common/middleware/auth.middleware.js';
 import { ProviderCredentialsModule } from './provider-credentials/provider-credentials.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { WebhooksModule } from './webhooks/webhooks.module.js';
+import { HealthController } from './health.controller.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET || 'supersecretjwtkey',
+      secret: process.env.JWT_ACCESS_SECRET || 'development-only-jwt-secret',
     }),
     PrismaModule,
     OrganizationModule,
@@ -30,7 +31,7 @@ import { WebhooksModule } from './webhooks/webhooks.module.js';
     NotificationsModule,
     WebhooksModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [AppService],
 })
 export class AppModule implements NestModule {
@@ -42,8 +43,8 @@ export class AppModule implements NestModule {
         { path: 'organization', method: RequestMethod.POST },
         { path: 'organization/login', method: RequestMethod.POST },
         { path: 'organization/refresh', method: RequestMethod.POST },
-        { path: 'webhooks/providers/:provider', method: RequestMethod.POST },
         { path: 'notifications/send', method: RequestMethod.POST },
+        { path: 'notifications/batch', method: RequestMethod.POST },
       )
       .forRoutes('organization/me', 'organization/logout', 'api-keys', 'provider-credentials', 'notifications', 'webhooks');
   }

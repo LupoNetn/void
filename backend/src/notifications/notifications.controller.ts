@@ -22,16 +22,25 @@ import type { OrganizationJwtPayload } from '../common/interfaces/jwt-payload.in
 import { SendNotificationDTO } from './dto/send-notification.dto.js';
 import { QueryNotificationsDto } from './dto/query-notifications.dto.js';
 import { NotificationAuthGuard } from '../common/guards/notification-auth.guard.js';
+import { ApiRateLimitGuard } from '../common/guards/api-rate-limit.guard.js';
+import { SendNotificationBatchDto } from './dto/send-batch.dto.js';
 
 @Controller('notifications')
 export class NotificationsController {
     constructor(private readonly notificationService: NotificationsService) { }
 
     @Post('send')
-    @UseGuards(NotificationAuthGuard)
+    @UseGuards(NotificationAuthGuard, ApiRateLimitGuard)
     @HttpCode(HttpStatus.ACCEPTED)
     async send(@Body() dto: SendNotificationDTO, @CurrentOrg() org: OrganizationJwtPayload, @Headers('idempotency-key') key?: string) {
         return this.notificationService.send(org.sub, dto, key);
+    }
+
+    @Post('batch')
+    @UseGuards(NotificationAuthGuard, ApiRateLimitGuard)
+    @HttpCode(HttpStatus.ACCEPTED)
+    async sendBatch(@Body() dto: SendNotificationBatchDto, @CurrentOrg() org: OrganizationJwtPayload, @Headers('idempotency-key') key?: string) {
+        return this.notificationService.sendBatch(org.sub, dto.notifications, key);
     }
 
     @Get()

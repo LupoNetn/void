@@ -8,12 +8,12 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
-    "deploy": "nest deploy",
+    "deploy": "prisma migrate deploy && node dist/main.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "prisma migrate deploy && node dist/main.js",
     "lint": "oxlint src/ test/",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -21,6 +21,7 @@
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy"
   }
 }

@@ -4,11 +4,13 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 
 /**
- * Derives a 32-byte Buffer key from ENCRYPTION_SECRET environment variable
- * or a development fallback key.
+ * Derives a 32-byte Buffer key from the required ENCRYPTION_SECRET.
  */
 function getEncryptionKey(): Buffer {
-  const secret = process.env.ENCRYPTION_SECRET || 'supersecretencryptionkey12345678';
+  const secret = process.env.ENCRYPTION_SECRET;
+  if (!secret || secret.length < 32 || secret.startsWith('replace-with')) {
+    throw new Error('ENCRYPTION_SECRET must be configured with at least 32 non-placeholder characters.');
+  }
   return crypto.createHash('sha256').update(secret).digest();
 }
 

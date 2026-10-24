@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import { SendNotificationDTO } from './dto/send-notification.dto.js';
 import { QueryNotificationsDto } from './dto/query-notifications.dto.js';
 import { DispatchService } from './dispatch.service.js';
+import type { BatchNotificationItemDto } from './dto/send-batch.dto.js';
 
 const TEMPLATE_SELECT_FIELDS = {
     id: true,
@@ -42,6 +43,11 @@ export class NotificationsService {
     }
 
     async send(organizationId: string, dto: SendNotificationDTO, idempotencyKey?: string) {
+        const recipientFields: Record<string, keyof typeof dto.recipient> = { EMAIL: 'email', SMS: 'phone', PUSH: 'pushToken', WEBHOOK: 'webhookUrl', IN_APP: 'externalUserId' };
+        const requiredRecipient = recipientFields[dto.channel];
+        if (!requiredRecipient || !dto.recipient[requiredRecipient]?.trim()) {
+            throw new BadRequestException(`${dto.channel} notifications require recipient.${String(requiredRecipient)}.`);
+        }
         const requestHash = createHash('sha256').update(JSON.stringify(dto)).digest('hex');
         if (idempotencyKey) {
             const existing = await this.prisma.idempotencyKey.findUnique({ where: { organizationId_key: { organizationId, key: idempotencyKey } } });
@@ -64,6 +70,43 @@ export class NotificationsService {
         const response = { message: 'Notification accepted for delivery.', data: notification };
         if (idempotencyKey) await this.prisma.idempotencyKey.create({ data: { organizationId, key: idempotencyKey, requestHash, responseCode: 202, responseBody: response as unknown as Prisma.InputJsonValue, expiresAt: new Date(Date.now() + 86400000) } });
         if (!notification.scheduledAt || notification.scheduledAt <= new Date()) this.dispatcher.wake(notification.id);
+        return response;
+    }
+
+    async sendBatch(organizationId: string, items: BatchNotificationItemDto[], idempotencyKey?: string) {
+        if (idempotencyKey && idempotencyKey.length > 200) throw new BadRequestException('Batch idempotency keys cannot exceed 200 characters.');
+        const batchKey = idempotencyKey ? `batch:${idempotencyKey}` : undefined;
+        const requestHash = createHash('sha256').update(JSON.stringify(items)).digest('hex');
+        if (batchKey) {
+            const existing = await this.prisma.idempotencyKey.findUnique({ where: { organizationId_key: { organizationId, key: batchKey } } });
+            if (existing) {
+                if (existing.requestHash !== requestHash) throw new ConflictException('This batch idempotency key was already used with a different request.');
+                return existing.responseBody;
+            }
+        }
+
+        const results = Array.from({ length: items.length }) as Array<Record<string, unknown>>;
+        let cursor = 0;
+        const workers = Array.from({ length: Math.min(10, items.length) }, async () => {
+            while (cursor < items.length) {
+                const index = cursor++;
+                const item = items[index];
+                const { idempotencyKey: itemKey, ...notification } = item;
+                try {
+                    const response = await this.send(organizationId, notification, itemKey ?? (idempotencyKey ? `${idempotencyKey}:${index}` : undefined));
+                    results[index] = { index, accepted: true, notification: (response as { data: unknown }).data };
+                } catch (error) {
+                    const statusCode = error instanceof HttpException ? error.getStatus() : 500;
+                    results[index] = { index, accepted: false, statusCode, error: error instanceof Error ? error.message : 'Notification could not be accepted.' };
+                }
+            }
+        });
+        await Promise.all(workers);
+        const accepted = results.filter(result => result.accepted).length;
+        const response = { message: 'Batch processed.', data: { total: items.length, accepted, rejected: items.length - accepted, results } };
+        if (batchKey) {
+            await this.prisma.idempotencyKey.create({ data: { organizationId, key: batchKey, requestHash, responseCode: 202, responseBody: response as unknown as Prisma.InputJsonValue, expiresAt: new Date(Date.now() + 86_400_000) } });
+        }
         return response;
     }
 
