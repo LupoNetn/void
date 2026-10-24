@@ -3,7 +3,7 @@ import './globals.css';
 import './theme.css';
 
 export const metadata: Metadata = {
-  title: 'Relay — Notification infrastructure',
+  title: 'Void — Notification infrastructure',
   description: 'Deliver and observe every product notification from one workspace.',
 };
 

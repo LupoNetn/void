@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: relay-api
+    name: void-api
     runtime: node
     plan: free
     buildCommand: npm ci && npm --workspace backend run prisma:generate && npm --workspace backend run build

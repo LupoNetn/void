@@ -1,2 +1,2 @@
-import { RelayApp } from '@/components/app/RelayApp';
-export default function DashboardPage(){ return <RelayApp/>; }
+import { VoidApp } from '@/components/app/VoidApp';
+export default function DashboardPage(){ return <VoidApp/>; }

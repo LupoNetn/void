@@ -1,4 +1,4 @@
-# Relay
+# Void
 
 Multi-tenant notification infrastructure with a NestJS API and a Next.js operations dashboard.
 
