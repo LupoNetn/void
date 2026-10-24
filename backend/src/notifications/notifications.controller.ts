@@ -11,6 +11,7 @@ import {
     Query,
     Headers,
     UseGuards,
+    ParseUUIDPipe,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service.js';
 import { CreateNotificationTemplate } from './dto/create-template.dto.js';
@@ -40,12 +41,6 @@ export class NotificationsController {
 
     @Get('stats')
     async stats(@CurrentOrg() org: OrganizationJwtPayload) { return this.notificationService.stats(org.sub); }
-
-    @Get(':id')
-    async get(@Param('id') id: string, @CurrentOrg() org: OrganizationJwtPayload) { return this.notificationService.get(org.sub, id); }
-
-    @Post(':id/cancel')
-    async cancel(@Param('id') id: string, @CurrentOrg() org: OrganizationJwtPayload) { return this.notificationService.cancel(org.sub, id); }
 
     @Post('templates')
     @HttpCode(HttpStatus.CREATED)
@@ -105,5 +100,22 @@ export class NotificationsController {
         @CurrentOrg() org: OrganizationJwtPayload,
     ) {
         return this.notificationService.deleteTemplate(org.sub, id);
+    }
+
+    // Dynamic notification routes must remain after all /templates routes.
+    @Get(':id')
+    async get(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @CurrentOrg() org: OrganizationJwtPayload,
+    ) {
+        return this.notificationService.get(org.sub, id);
+    }
+
+    @Post(':id/cancel')
+    async cancel(
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @CurrentOrg() org: OrganizationJwtPayload,
+    ) {
+        return this.notificationService.cancel(org.sub, id);
     }
 }
