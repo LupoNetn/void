@@ -28,7 +28,7 @@ The API runs on `http://localhost:3000`; the dashboard runs on `http://localhost
 
 Deploy the NestJS API as a persistent Node service. The included `render.yaml` provisions a free Render web service, applies Prisma migrations before startup, and uses `/health/ready` for readiness checks. Set `DATABASE_URL`, `DIRECT_URL`, and `CORS_ORIGINS`; Render generates the three application secrets. Never change `ENCRYPTION_SECRET` after storing provider credentials unless those credentials are re-encrypted. Render's free service can spin down and is appropriate for demos or low-traffic evaluation; use an always-on paid instance for dependable production delivery and scheduled jobs.
 
-The Render build explicitly installs development dependencies because the Nest compiler is a build-time tool, while the runtime remains in production mode. Node 22 is pinned in both the repository and Blueprint to match the tested Prisma/Nest runtime.
+The Nest compiler and TypeScript build toolchain are explicit root dependencies so Render can compile with a standard production-mode `npm ci`. Node 22 is pinned in both the repository and Blueprint to match the tested Prisma/Nest runtime.
 
 Deploy the repository root to Vercel for the Next.js frontend using the included `vercel.json`. Set `BACKEND_URL` to the public HTTPS URL of the NestJS service. Set the backend's `CORS_ORIGINS` to the final frontend origin (comma-separate preview origins only when explicitly needed).
 
