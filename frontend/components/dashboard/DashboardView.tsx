@@ -8,7 +8,7 @@ import { ProviderCards } from './ProviderCards';
 
 const endpoints:Record<View,string>={overview:'/notifications/stats',notifications:'/notifications?limit=50',templates:'/notifications/templates?limit=100',providers:'/provider-credentials',api:'/api-keys',webhooks:'/webhooks'};
 const copy={
-  notifications:['Notifications','Every message, attempt and outcome in one place.','send','Send notification'],
+  notifications:['Notifications','Every API message, attempt and outcome in one place.',null,null],
   templates:['Templates','Versioned content with safe variable interpolation.','template','New template +'],
   providers:['Providers','Connect your own encrypted delivery credentials.','provider','Connect provider +'],
   api:['API keys','Authenticate server-to-server notification requests.','key','Create key +'],
@@ -21,5 +21,5 @@ export function DashboardView({view,token,refresh,onAction}:{view:View;token:str
   if(!result)return <WorkspaceLoader/>;
   if(view==='overview')return <Overview stats={result.data}/>;
   const [title,subtitle,action,label]=copy[view];const rows:ApiRecord[]=result.data??[];
-  return <><PageHead title={title} subtitle={subtitle} action={<button className="primary" onClick={()=>onAction(action)}>{label}</button>}/>{view==='providers'?<ProviderCards providers={rows} onConfigure={channel=>onAction(`provider:${channel}`)}/>:<DataTable view={view} rows={rows}/>}</>;
+  return <><PageHead title={title} subtitle={subtitle} action={action&&label?<button className="primary" onClick={()=>onAction(action)}>{label}</button>:undefined}/>{view==='providers'?<ProviderCards providers={rows} onConfigure={channel=>onAction(`provider:${channel}`)}/>:<DataTable view={view} rows={rows}/>}</>;
 }

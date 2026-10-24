@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: relay-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm --workspace backend run prisma:generate && npm --workspace backend run build
+    startCommand: npm --workspace backend run start:prod
+    healthCheckPath: /health/ready
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: ENCRYPTION_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: API_RATE_LIMIT_PER_MINUTE
+        value: 120
