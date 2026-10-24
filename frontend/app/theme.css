@@ -25,3 +25,11 @@ html, body, button, input, select, textarea {
 .toast div { flex: 1; }.toast strong, .toast small { display: block; }.toast strong { font-size: 12px; color: inherit; }.toast small { margin-top: 3px; color: #8eaaa0; line-height: 1.4; }.toast.error small { color: #bd8f94; }.toast button { border: 0; background: none; color: #77827d; font-size: 17px; padding: 0 2px; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (max-width: 580px) { .toast { left: 16px; right: 16px; min-width: 0; bottom: 16px; } }
+.sidebar nav button svg { width: 17px; flex: 0 0 17px; color: #68737b; stroke-width: 1.7; }
+.sidebar nav button.active svg { color: #a9c0ca; }
+.workspace>svg { color: #657078; }
+.docs>svg { box-sizing: content-box; padding: 5px; border: 1px solid #333b40; border-radius: 6px; }
+.logout svg { stroke-width: 1.7; }
+.command, .action-button { display: inline-flex; align-items: center; gap: 8px; }
+.icon-btn { display: inline-grid; place-items: center; }
+.provider-icon svg, .channel-icon svg { stroke-width: 1.65; }

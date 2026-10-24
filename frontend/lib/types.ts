@@ -10,11 +10,11 @@ export type Organization = {
 
 export type ApiRecord = Record<string, any>;
 
-export const navigation: { id: View; label: string; icon: string; group?: string }[] = [
-  { id: 'overview', label: 'Overview', icon: '⌂', group: 'Workspace' },
-  { id: 'notifications', label: 'Notifications', icon: '↗' },
-  { id: 'templates', label: 'Templates', icon: '▱' },
-  { id: 'providers', label: 'Providers', icon: '◈', group: 'Developer' },
-  { id: 'api', label: 'API keys', icon: '⌘' },
-  { id: 'webhooks', label: 'Webhooks', icon: '⌁' },
+export const navigation: { id: View; label: string; group?: string }[] = [
+  { id: 'overview', label: 'Overview', group: 'Workspace' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'templates', label: 'Templates' },
+  { id: 'providers', label: 'Providers', group: 'Developer' },
+  { id: 'api', label: 'API keys' },
+  { id: 'webhooks', label: 'Webhooks' },
 ];
