@@ -26,7 +26,7 @@ The API runs on `http://localhost:3000`; the dashboard runs on `http://localhost
 
 ## Production deployment
 
-Deploy the NestJS API as a persistent Node service. The included `render.yaml` provisions a Render web service, applies Prisma migrations before startup, and uses `/health/ready` for readiness checks. Set `DATABASE_URL`, `DIRECT_URL`, and `CORS_ORIGINS`; Render generates the three application secrets. Never change `ENCRYPTION_SECRET` after storing provider credentials unless those credentials are re-encrypted.
+Deploy the NestJS API as a persistent Node service. The included `render.yaml` provisions a free Render web service, applies Prisma migrations before startup, and uses `/health/ready` for readiness checks. Set `DATABASE_URL`, `DIRECT_URL`, and `CORS_ORIGINS`; Render generates the three application secrets. Never change `ENCRYPTION_SECRET` after storing provider credentials unless those credentials are re-encrypted. Render's free service can spin down and is appropriate for demos or low-traffic evaluation; use an always-on paid instance for dependable production delivery and scheduled jobs.
 
 Deploy the repository root to Vercel for the Next.js frontend using the included `vercel.json`. Set `BACKEND_URL` to the public HTTPS URL of the NestJS service. Set the backend's `CORS_ORIGINS` to the final frontend origin (comma-separate preview origins only when explicitly needed).
 
