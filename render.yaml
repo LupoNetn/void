@@ -3,13 +3,15 @@ services:
     name: relay-api
     runtime: node
     plan: free
-    buildCommand: npm ci && npm --workspace backend run prisma:generate && npm --workspace backend run build
+    buildCommand: npm ci --include=dev && npm --workspace backend run prisma:generate && npm --workspace backend run build
     startCommand: npm --workspace backend run start:prod
     healthCheckPath: /health/ready
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22.22.0
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
